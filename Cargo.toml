@@ -1,0 +1,10 @@
+[package]
+name = "template" # enter your project name
+version = "0.1.0"
+edition = "2021"
+authors = ["Noah <upupqi.cs@gmail.com>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "^1.0"
