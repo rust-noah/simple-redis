@@ -1,9 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::BTreeMap;
 
 use bytes::BytesMut;
+use enum_dispatch::enum_dispatch;
 
 mod encode;
 
+#[enum_dispatch]
 pub trait RespEncode {
     fn encode(self) -> Vec<u8>;
 }
@@ -12,6 +14,7 @@ pub trait RespDecode {
     fn decode(buf: Self) -> Result<RespFrame, String>;
 }
 // 之所以要定义一些新的结构体, 是因为要在实现 trait 的时候, 要区分开这些类型
+#[enum_dispatch(RespEncode)]
 pub enum RespFrame {
     SimpleString(SimpleString),
     Error(SimpleError),
@@ -32,19 +35,52 @@ pub enum RespFrame {
 // 2. 新类型模式：这是 Rust 中常用的一种模式，用于在类型系统层面区分不同用途的相同底层类型。比如，你可能想区分普通的字符串和特定格式的字符串。
 // 3. 添加方法：你可以为 SimpleString 实现方法，这些方法特定于这种类型的字符串。
 // 4. 语义清晰：在复杂的数据结构中（如你展示的 RespFrame 枚举），使用 SimpleString 而不是直接使用 String 可以使代码的意图更加明确。
-pub struct SimpleString(String);
+pub struct SimpleString(String); // Simple String, 用于存储简单字符串
 pub struct SimpleError(String);
-pub struct BulkString(Vec<u8>);
+pub struct BulkString(Vec<u8>); // 单个二进制字符串, 用于存储二进制数据(最大512MB)
 pub struct RespNullBulkString;
 pub struct RespArray(Vec<RespFrame>);
 pub struct RespNullArray;
 pub struct RespNull;
-pub struct RespMap(HashMap<String, RespFrame>);
-pub struct RespSet(HashSet<RespFrame>);
+#[derive(Default)]
+pub struct RespMap(BTreeMap<String, RespFrame>); // 改为 BTreeMap, 用于有序的 key-value 数据
+
+// pub struct RespSet(HashSet<RespFrame>);
+pub struct RespSet(Vec<RespFrame>); // 改为 Vec, 用于有序的集合数据
 
 impl SimpleString {
     pub fn new(s: impl Into<String>) -> Self {
         SimpleString(s.into())
+    }
+}
+
+impl SimpleError {
+    pub fn new(s: impl Into<String>) -> Self {
+        SimpleError(s.into())
+    }
+}
+
+impl BulkString {
+    pub fn new(s: impl Into<Vec<u8>>) -> Self {
+        BulkString(s.into())
+    }
+}
+
+impl RespArray {
+    pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
+        RespArray(s.into())
+    }
+}
+
+impl RespMap {
+    pub fn new() -> Self {
+        RespMap(BTreeMap::new())
+    }
+}
+
+impl RespSet {
+    pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
+        RespSet(s.into())
     }
 }
 
@@ -54,8 +90,8 @@ impl RespDecode for BytesMut {
     }
 }
 
-impl RespEncode for RespFrame {
-    fn encode(self) -> Vec<u8> {
-        todo!()
-    }
-}
+// impl RespEncode for RespFrame {
+//     fn encode(self) -> Vec<u8> {
+//         todo!()
+//     }
+// }
