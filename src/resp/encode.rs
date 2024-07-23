@@ -167,6 +167,12 @@ impl Deref for BulkString {
     }
 }
 
+impl AsRef<[u8]> for BulkString {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl Deref for RespArray {
     type Target = Vec<RespFrame>;
 
@@ -197,6 +203,10 @@ impl Deref for RespSet {
     }
 }
 
+// enum_dispatch
+// 这里因为 enum_dispatch 的原因, 会自动为变体类型生成, From<xxx> for Enum_Name
+// 因此当构造出变体类型的时候, 可以使用 into 方法将其转换为枚举类型, 或者 from
+// 因为实现了 from 会自动实现 into, 实现了 into 会自动实现 from
 #[cfg(test)]
 mod test {
     use super::*;
@@ -261,7 +271,7 @@ mod test {
 
     #[test]
     fn test_boolean_encode() {
-        // into 和 from 是互斥的
+        // into 和 from 是互逆的
         // let frame: RespFrame = true.into();
         let frame = RespFrame::from(true);
         assert_eq!(frame.encode(), b"#t\r\n");
@@ -278,7 +288,7 @@ mod test {
         let frame: RespFrame = (-123.456).into();
         assert_eq!(frame.encode(), b",-123.456\r\n");
 
-        let frame: RespFrame = 1.23456e+8.into();
+        let frame: RespFrame = (1.23456e+8).into();
         assert_eq!(frame.encode(), b",+1.23456e8\r\n");
 
         let frame: RespFrame = (-1.23456e-9).into();
