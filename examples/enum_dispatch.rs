@@ -25,6 +25,7 @@ impl DoSomething for B {
         println!("B");
     }
 }
+
 fn main() {
     // test enum_dispatch
     let apple = Types::Apple(A);

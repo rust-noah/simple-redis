@@ -57,6 +57,7 @@ pub enum RespError {
 
 // 之所以要定义一些新的结构体, 是因为要在实现 trait 的时候, 要区分开这些类型
 #[enum_dispatch(RespEncode)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RespFrame {
     SimpleString(SimpleString),
     Error(SimpleError),
@@ -67,7 +68,7 @@ pub enum RespFrame {
     NullArray(RespNullArray),
     Null(RespNull),
     Boolean(bool),
-    Double(f64),
+    Double(f64), // f64 can't derive Eq
     Map(RespMap),
     Set(RespSet),
 }
@@ -78,24 +79,25 @@ pub enum RespFrame {
 // 3. 添加方法：你可以为 SimpleString 实现方法，这些方法特定于这种类型的字符串。
 // 4. 语义清晰：在复杂的数据结构中（如你展示的 RespFrame 枚举），使用 SimpleString 而不是直接使用 String 可以使代码的意图更加明确。
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleString(String); // Simple String, 用于存储简单字符串
+pub struct SimpleString(pub(crate) String); // Simple String, 用于存储简单字符串
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleError(String);
+pub struct SimpleError(pub(crate) String);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct BulkString(Vec<u8>); // 单个二进制字符串, 用于存储二进制数据(最大512MB)
+pub struct BulkString(pub(crate) Vec<u8>); // 单个二进制字符串, 用于存储二进制数据(最大512MB)
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNullBulkString;
-
-pub struct RespArray(Vec<RespFrame>);
+#[derive(Debug, Clone, PartialEq)]
+pub struct RespArray(pub(crate) Vec<RespFrame>);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNullArray;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNull;
-#[derive(Default)]
-pub struct RespMap(BTreeMap<String, RespFrame>); // 改为 BTreeMap, 用于有序的 key-value 数据
-
+// 改为 BTreeMap, 用于有序的 key-value 数据
+#[derive(Default, Clone, Debug, PartialEq)]
+pub struct RespMap(pub(crate) BTreeMap<String, RespFrame>);
 // pub struct RespSet(HashSet<RespFrame>);
-pub struct RespSet(Vec<RespFrame>); // 改为 Vec, 用于有序的集合数据
+#[derive(Debug, Clone, PartialEq)]
+pub struct RespSet(pub(crate) Vec<RespFrame>); // 改为 Vec, 用于有序的集合数据
 
 impl SimpleString {
     pub fn new(s: impl Into<String>) -> Self {
@@ -130,6 +132,48 @@ impl RespMap {
 impl RespSet {
     pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
         RespSet(s.into())
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for RespFrame {
+    fn from(s: &[u8; N]) -> Self {
+        BulkString(s.to_vec()).into()
+    }
+}
+
+impl From<&[u8]> for RespFrame {
+    fn from(s: &[u8]) -> Self {
+        BulkString(s.to_vec()).into()
+    }
+}
+
+impl From<&str> for RespFrame {
+    fn from(s: &str) -> Self {
+        SimpleString(s.to_string()).into()
+    }
+}
+
+impl From<&str> for BulkString {
+    fn from(s: &str) -> Self {
+        BulkString(s.as_bytes().to_vec())
+    }
+}
+
+impl From<String> for BulkString {
+    fn from(s: String) -> Self {
+        BulkString(s.into_bytes())
+    }
+}
+
+impl From<&[u8]> for BulkString {
+    fn from(s: &[u8]) -> Self {
+        BulkString(s.to_vec())
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for BulkString {
+    fn from(s: &[u8; N]) -> Self {
+        BulkString(s.to_vec())
     }
 }
 
