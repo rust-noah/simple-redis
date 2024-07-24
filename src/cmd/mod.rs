@@ -8,6 +8,10 @@ mod hmap;
 mod map;
 
 // you could also use once_cell instead of lazy_static
+// lazy_static:
+// 1. init in runtime
+// 2. thread safe
+// 3. improve performance
 lazy_static! {
     static ref RESP_OK: RespFrame = SimpleString::new("OK").into();
 }

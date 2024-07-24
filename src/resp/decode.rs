@@ -9,6 +9,7 @@ use super::{
     calc_total_length, extract_fixed_data, extract_simple_frame_data, parse_length, CRLF_LEN,
 };
 
+// region:    --- impls
 impl RespDecode for RespFrame {
     const PREFIX: &'static str = "";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
@@ -324,6 +325,7 @@ impl RespDecode for RespSet {
         calc_total_length(buf, end, len, Self::PREFIX)
     }
 }
+// endregion: --- impls
 
 #[cfg(test)]
 mod tests {

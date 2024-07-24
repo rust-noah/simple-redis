@@ -9,6 +9,7 @@ mod encode;
 const CRLF: &[u8] = b"\r\n";
 const CRLF_LEN: usize = CRLF.len();
 
+// region:    --- Traits
 #[enum_dispatch]
 pub trait RespEncode {
     fn encode(self) -> Vec<u8>;
@@ -21,7 +22,9 @@ pub trait RespDecode: Sized {
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
     fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 }
+// endregion: --- Traits
 
+// region:    --- Enum and Structs
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum RespError {
     // region:    --- thiserror format usage
@@ -99,6 +102,9 @@ pub struct RespMap(pub(crate) BTreeMap<String, RespFrame>);
 #[derive(Debug, Clone, PartialEq)]
 pub struct RespSet(pub(crate) Vec<RespFrame>); // 改为 Vec, 用于有序的集合数据
 
+// endregion: --- Enum and Structs
+
+// region:    --- impls
 impl SimpleString {
     pub fn new(s: impl Into<String>) -> Self {
         SimpleString(s.into())
@@ -176,7 +182,9 @@ impl<const N: usize> From<&[u8; N]> for BulkString {
         BulkString(s.to_vec())
     }
 }
+// endregion: --- impls
 
+// region:    --- Functions
 // utility functions
 fn extract_fixed_data(
     buf: &mut BytesMut,
@@ -265,3 +273,5 @@ fn calc_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result
         _ => Ok(len + CRLF_LEN),
     }
 }
+
+// endregion: --- Functions

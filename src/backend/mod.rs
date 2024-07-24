@@ -3,6 +3,7 @@ use dashmap::DashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
+// region:    --- Enums and Structs
 #[derive(Debug, Clone)]
 pub struct Backend(Arc<BackendInner>);
 
@@ -11,7 +12,9 @@ pub struct BackendInner {
     pub(crate) map: DashMap<String, RespFrame>,
     pub(crate) hmap: DashMap<String, DashMap<String, RespFrame>>,
 }
+// endregion: --- Enums and Structs
 
+// region:    --- impls
 impl Deref for Backend {
     type Target = BackendInner;
 
@@ -63,3 +66,4 @@ impl Backend {
         self.hmap.get(key).map(|v| v.clone())
     }
 }
+// endregion: --- impls

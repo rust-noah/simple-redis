@@ -10,6 +10,7 @@ use crate::{
 
 const BUF_CAP: usize = 4096;
 
+// region:    --- impls
 // - simple string: "+<string>\r\n"
 impl RespEncode for SimpleString {
     fn encode(self) -> Vec<u8> {
@@ -202,6 +203,7 @@ impl Deref for RespSet {
         &self.0
     }
 }
+// endregion: --- impls
 
 // enum_dispatch
 // 这里因为 enum_dispatch 的原因, 会自动为变体类型生成, From<xxx> for Enum_Name
