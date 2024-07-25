@@ -4,6 +4,10 @@ use super::{
     extract_args, validate_command, CommandError, CommandExecutor, HGet, HGetAll, HSet, RESP_OK,
 };
 
+// region:    --- impls
+
+// endregion: --- impls
+
 impl CommandExecutor for HGet {
     fn execute(self, backend: &crate::Backend) -> RespFrame {
         match backend.hget(&self.key, &self.field) {
