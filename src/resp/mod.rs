@@ -58,6 +58,13 @@ pub enum RespError {
 //     fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 // }
 
+// 关于 enum 的知识点
+// 枚举变体: 直接包含数据, 结构体类型, 无数据
+
+// 元组变体: 当枚举变体直接包含一组命名未指定的值时-> SimpleString(String) 和 Integer(i64),
+// 结构体变体: 枚举的变体被定义为包含具有名称的字段-> StructVariant { name: String, id: i32 }
+// 单元变体: RespNull
+
 // 之所以要定义一些新的结构体, 是因为要在实现 trait 的时候, 要区分开这些类型
 #[enum_dispatch(RespEncode)]
 #[derive(Debug, Clone, PartialEq)]

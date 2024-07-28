@@ -1,5 +1,6 @@
+use std::sync::LazyLock;
+
 use enum_dispatch::enum_dispatch;
-use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{Backend, RespArray, RespError, RespFrame, SimpleString};
@@ -12,9 +13,13 @@ mod map;
 // 1. init in runtime
 // 2. thread safe
 // 3. improve performance
-lazy_static! {
-    static ref RESP_OK: RespFrame = SimpleString::new("OK").into();
-}
+// lazy_static! {
+//     static ref RESP_OK: RespFrame = SimpleString::new("OK").into();
+// }
+
+// > Rust 1.80.0
+// https://blog.rust-lang.org/2024/07/25/Rust-1.80.0.html
+static RESP_OK: LazyLock<RespFrame> = LazyLock::new(|| SimpleString::new("OK").into());
 
 // region:    --- Traits
 #[enum_dispatch]
@@ -104,6 +109,18 @@ impl TryFrom<RespArray> for Command {
             },
             _ => Err(CommandError::InvalidCommand(
                 "Command must have a BulkString as the first argument".to_string(),
+            )),
+        }
+    }
+}
+
+impl TryFrom<RespFrame> for Command {
+    type Error = CommandError;
+    fn try_from(v: RespFrame) -> Result<Self, Self::Error> {
+        match v {
+            RespFrame::Array(array) => array.try_into(),
+            _ => Err(CommandError::InvalidCommand(
+                "Command must be an Array".to_string(),
             )),
         }
     }
