@@ -37,7 +37,15 @@ pub async fn stream_handler(stream: TcpStream, backend: Backend) -> Result<()> {
                 };
                 let response = request_handler(request).await?;
                 info!("Sending response: {:?}", response.frame);
-                framed.send(response.frame).await?;
+
+                // NOTE: When dealing with a large amount of concurrent data,
+                // flushing the sink each time will incur performance overhead.
+                // framed.send(response.frame).await?;
+
+                // 使用 feed 方法添加响应
+                framed.feed(response.frame).await?;
+                // 在合适的时候调用 flush 方法
+                framed.flush().await?;
             }
             Some(Err(e)) => return Err(e),
             None => return Ok(()),

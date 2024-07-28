@@ -8,7 +8,7 @@ use crate::{Backend, RespArray, RespError, RespFrame, SimpleString};
 mod hmap;
 mod map;
 
-// you could also use once_cell instead of lazy_static
+// NOTE: you could also use once_cell instead of lazy_static
 // lazy_static:
 // 1. init in runtime
 // 2. thread safe
@@ -17,7 +17,7 @@ mod map;
 //     static ref RESP_OK: RespFrame = SimpleString::new("OK").into();
 // }
 
-// > Rust 1.80.0
+// NOTE: > Rust 1.80.0
 // https://blog.rust-lang.org/2024/07/25/Rust-1.80.0.html
 static RESP_OK: LazyLock<RespFrame> = LazyLock::new(|| SimpleString::new("OK").into());
 
