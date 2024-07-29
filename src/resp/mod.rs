@@ -1,13 +1,33 @@
+mod array;
+mod bool;
+mod bulk_string;
+mod double;
+mod frame;
+mod integer;
+mod map;
+mod null;
+mod set;
+mod simple_error;
+mod simple_string;
+
 use bytes::{Buf, BytesMut};
 use enum_dispatch::enum_dispatch;
-use std::collections::BTreeMap;
 use thiserror::Error;
 
-mod decode;
-mod encode;
+pub use self::{
+    array::{RespArray, RespNullArray},
+    bulk_string::{BulkString, RespNullBulkString},
+    frame::RespFrame,
+    map::RespMap,
+    null::RespNull,
+    set::RespSet,
+    simple_error::SimpleError,
+    simple_string::SimpleString,
+};
 
 const CRLF: &[u8] = b"\r\n";
 const CRLF_LEN: usize = CRLF.len();
+const BUF_CAP: usize = 4096;
 
 // region:    --- Traits
 #[enum_dispatch]
@@ -28,12 +48,10 @@ pub trait RespDecode: Sized {
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum RespError {
     // region:    --- thiserror format usage
-
     // #[error("{var}")] ⟶ write!("{}", self.var)
     // #[error("{0}")] ⟶ write!("{}", self.0)
     // #[error("{var:?}")] ⟶ write!("{:?}", self.var)
     // #[error("{0:?}")] ⟶ write!("{:?}", self.0)
-
     // endregion: --- thiserror format usage
     #[error("Invalid frame: {0}")] // 这里的 0 表示 self.0。 会转化为 write!
     InvalidFrame(String),
@@ -57,139 +75,35 @@ pub enum RespError {
 //     fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
 //     fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 // }
-
-// 关于 enum 的知识点
-// 枚举变体: 直接包含数据, 结构体类型, 无数据
-
-// 元组变体: 当枚举变体直接包含一组命名未指定的值时-> SimpleString(String) 和 Integer(i64),
-// 结构体变体: 枚举的变体被定义为包含具有名称的字段-> StructVariant { name: String, id: i32 }
-// 单元变体: RespNull
-
-// 之所以要定义一些新的结构体, 是因为要在实现 trait 的时候, 要区分开这些类型
-#[enum_dispatch(RespEncode)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum RespFrame {
-    SimpleString(SimpleString),
-    Error(SimpleError),
-    Integer(i64),
-    BulkString(BulkString),
-    NullBulkString(RespNullBulkString),
-    Array(RespArray),
-    NullArray(RespNullArray),
-    Null(RespNull),
-    Boolean(bool),
-    Double(f64), // f64 can't derive Eq
-    Map(RespMap),
-    Set(RespSet),
-}
-
+// region:    --- before refactor
+// 改为 Vec, 用于有序的集合数据
 // 这种结构体的主要用途是：
 // 1. 类型封装：它为 String 类型创建了一个新的类型。这可以用于增加类型安全性，或者为特定用途的字符串提供一个更有意义的名称。
 // 2. 新类型模式：这是 Rust 中常用的一种模式，用于在类型系统层面区分不同用途的相同底层类型。比如，你可能想区分普通的字符串和特定格式的字符串。
 // 3. 添加方法：你可以为 SimpleString 实现方法，这些方法特定于这种类型的字符串。
 // 4. 语义清晰：在复杂的数据结构中（如你展示的 RespFrame 枚举），使用 SimpleString 而不是直接使用 String 可以使代码的意图更加明确。
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleString(pub(crate) String); // Simple String, 用于存储简单字符串
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleError(pub(crate) String);
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct BulkString(pub(crate) Vec<u8>); // 单个二进制字符串, 用于存储二进制数据(最大512MB)
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct RespNullBulkString;
-#[derive(Debug, Clone, PartialEq)]
-pub struct RespArray(pub(crate) Vec<RespFrame>);
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct RespNullArray;
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct RespNull;
-// 改为 BTreeMap, 用于有序的 key-value 数据
-#[derive(Default, Clone, Debug, PartialEq)]
-pub struct RespMap(pub(crate) BTreeMap<String, RespFrame>);
-// pub struct RespSet(HashSet<RespFrame>);
-#[derive(Debug, Clone, PartialEq)]
-pub struct RespSet(pub(crate) Vec<RespFrame>); // 改为 Vec, 用于有序的集合数据
-
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+// pub struct SimpleString(pub(crate) String); // Simple String, 用于存储简单字符串
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+// pub struct SimpleError(pub(crate) String);
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+// pub struct BulkString(pub(crate) Vec<u8>); // 单个二进制字符串, 用于存储二进制数据(最大512MB)
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+// pub struct RespNullBulkString;
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct RespArray(pub(crate) Vec<RespFrame>);
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+// pub struct RespNullArray;
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+// pub struct RespNull;
+// // 改为 BTreeMap, 用于有序的 key-value 数据
+// #[derive(Default, Clone, Debug, PartialEq)]
+// pub struct RespMap(pub(crate) BTreeMap<String, RespFrame>);
+// // pub struct RespSet(HashSet<RespFrame>);
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct RespSet(pub(crate) Vec<RespFrame>); // 改为 Vec, 用于有序的集合数据
+// endregion: --- before refactor
 // endregion: --- Enum and Structs
-
-// region:    --- impls
-impl SimpleString {
-    pub fn new(s: impl Into<String>) -> Self {
-        SimpleString(s.into())
-    }
-}
-
-impl SimpleError {
-    pub fn new(s: impl Into<String>) -> Self {
-        SimpleError(s.into())
-    }
-}
-
-impl BulkString {
-    pub fn new(s: impl Into<Vec<u8>>) -> Self {
-        BulkString(s.into())
-    }
-}
-
-impl RespArray {
-    pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
-        RespArray(s.into())
-    }
-}
-
-impl RespMap {
-    pub fn new() -> Self {
-        RespMap(BTreeMap::new())
-    }
-}
-
-impl RespSet {
-    pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
-        RespSet(s.into())
-    }
-}
-
-impl<const N: usize> From<&[u8; N]> for RespFrame {
-    fn from(s: &[u8; N]) -> Self {
-        BulkString(s.to_vec()).into()
-    }
-}
-
-impl From<&[u8]> for RespFrame {
-    fn from(s: &[u8]) -> Self {
-        BulkString(s.to_vec()).into()
-    }
-}
-
-impl From<&str> for RespFrame {
-    fn from(s: &str) -> Self {
-        SimpleString(s.to_string()).into()
-    }
-}
-
-impl From<&str> for BulkString {
-    fn from(s: &str) -> Self {
-        BulkString(s.as_bytes().to_vec())
-    }
-}
-
-impl From<String> for BulkString {
-    fn from(s: String) -> Self {
-        BulkString(s.into_bytes())
-    }
-}
-
-impl From<&[u8]> for BulkString {
-    fn from(s: &[u8]) -> Self {
-        BulkString(s.to_vec())
-    }
-}
-
-impl<const N: usize> From<&[u8; N]> for BulkString {
-    fn from(s: &[u8; N]) -> Self {
-        BulkString(s.to_vec())
-    }
-}
-// endregion: --- impls
 
 // region:    --- Functions
 // utility functions
@@ -282,3 +196,28 @@ fn calc_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result
 }
 
 // endregion: --- Functions
+
+// enum_dispatch
+// 这里因为 enum_dispatch 的原因, 会自动为变体类型生成, From<xxx> for Enum_Name
+// 因此当构造出变体类型的时候, 可以使用 into 方法将其转换为枚举类型, 或者 from
+// 因为实现了 from 会自动实现 into, 实现了 into 会自动实现 from
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_calc_array_length() -> Result<()> {
+        let buf = b"*2\r\n$3\r\nset\r\n$5\r\nhello\r\n";
+        let (end, len) = parse_length(buf, "*")?;
+        let total_len = calc_total_length(buf, end, len, "*")?;
+        assert_eq!(total_len, buf.len());
+
+        let buf = b"*2\r\n$3\r\nset\r\n";
+        let (end, len) = parse_length(buf, "*")?;
+        let ret = calc_total_length(buf, end, len, "*");
+        assert_eq!(ret.unwrap_err(), RespError::NotComplete);
+
+        Ok(())
+    }
+}

@@ -56,8 +56,9 @@ impl TryFrom<RespArray> for Set {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::RespDecode;
+
+    use super::*;
     use anyhow::Result;
     use bytes::BytesMut;
 
