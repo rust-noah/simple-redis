@@ -1,12 +1,25 @@
 use std::sync::LazyLock;
 
+use command::CommandError;
 use enum_dispatch::enum_dispatch;
-use thiserror::Error;
 
-use crate::{Backend, RespArray, RespError, RespFrame, SimpleString};
+use crate::{Backend, RespArray, RespFrame, SimpleString};
 
+mod command;
+mod echo;
 mod hmap;
 mod map;
+mod set;
+mod unrecognized;
+
+pub use {
+    command::Command,
+    echo::Echo,
+    hmap::{HGet, HGetAll, HMGet, HSet},
+    map::{Get, Set},
+    set::{SAdd, SIsMember},
+    unrecognized::Unrecognized,
+};
 
 // NOTE: you could also use once_cell instead of lazy_static
 // lazy_static:
@@ -21,119 +34,18 @@ mod map;
 // https://blog.rust-lang.org/2024/07/25/Rust-1.80.0.html
 static RESP_OK: LazyLock<RespFrame> = LazyLock::new(|| SimpleString::new("OK").into());
 
-// region:    --- Traits
 #[enum_dispatch]
 pub trait CommandExecutor {
     // fn execute(&self) -> RespFrame;
     fn execute(self, backend: &Backend) -> RespFrame;
 }
-// endregion: --- Traits
 
-// region:    --- Enum and Structs
-#[enum_dispatch(CommandExecutor)]
-#[derive(Debug)]
-pub enum Command {
-    Get(Get),
-    Set(Set),
-    HGet(HGet),
-    HSet(HSet),
-    HGetAll(HGetAll),
-    // unrecognized command
-    Unrecognized(Unrecognized),
-}
-
-#[derive(Error, Debug)]
-pub enum CommandError {
-    #[error("Invalid command: {0}")]
-    InvalidCommand(String),
-    #[error("Invalid argument: {0}")]
-    InvalidArgument(String),
-    #[error("{0}")]
-    RespError(#[from] RespError),
-    #[error("Utf8 error: {0}")]
-    Utf8Error(#[from] std::string::FromUtf8Error),
-}
-
-#[derive(Debug)]
-pub struct Get {
-    key: String,
-}
-
-#[derive(Debug)]
-pub struct Set {
-    key: String,
-    value: RespFrame,
-}
-
-#[derive(Debug)]
-pub struct HGet {
-    key: String,
-    field: String,
-}
-
-#[derive(Debug)]
-pub struct HSet {
-    key: String,
-    field: String,
-    value: RespFrame,
-}
-
-#[derive(Debug)]
-pub struct HGetAll {
-    key: String,
-    sort: bool,
-}
-
-#[derive(Debug)]
-pub struct Unrecognized;
-// endregion: --- Enum and Structs
-
-// region:    --- impls
-impl CommandExecutor for Unrecognized {
-    fn execute(self, _: &Backend) -> RespFrame {
-        RESP_OK.clone()
-    }
-}
-
-impl TryFrom<RespArray> for Command {
-    type Error = CommandError;
-    fn try_from(v: RespArray) -> Result<Self, Self::Error> {
-        match v.first() {
-            Some(RespFrame::BulkString(ref cmd)) => match cmd.as_ref() {
-                b"get" => Ok(Get::try_from(v)?.into()),
-                b"set" => Ok(Set::try_from(v)?.into()),
-                b"hget" => Ok(HGet::try_from(v)?.into()),
-                b"hset" => Ok(HSet::try_from(v)?.into()),
-                b"hgetall" => Ok(HGetAll::try_from(v)?.into()),
-                _ => Ok(Unrecognized.into()),
-            },
-            _ => Err(CommandError::InvalidCommand(
-                "Command must have a BulkString as the first argument".to_string(),
-            )),
-        }
-    }
-}
-
-impl TryFrom<RespFrame> for Command {
-    type Error = CommandError;
-    fn try_from(v: RespFrame) -> Result<Self, Self::Error> {
-        match v {
-            RespFrame::Array(array) => array.try_into(),
-            _ => Err(CommandError::InvalidCommand(
-                "Command must be an Array".to_string(),
-            )),
-        }
-    }
-}
-// endregion: --- impls
-
-// region:    --- functions
 fn validate_command(
     value: &RespArray,
     names: &[&'static str],
     n_args: usize,
 ) -> Result<(), CommandError> {
-    if value.len() != n_args + names.len() {
+    if n_args != usize::MAX && value.len() != n_args + names.len() {
         return Err(CommandError::InvalidArgument(format!(
             "{} command must have exactly {} argument",
             names.join(" "),
@@ -165,4 +77,3 @@ fn validate_command(
 fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
     Ok(value.0.into_iter().skip(start).collect::<Vec<RespFrame>>())
 }
-// endregion: --- functions
