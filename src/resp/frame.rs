@@ -2,8 +2,8 @@ use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
 
 use super::{
-    BulkString, RespArray, RespDecode, RespError, RespMap, RespNull, RespNullArray,
-    RespNullBulkString, RespSet, SimpleError, SimpleString,
+    BulkString, RespArray, RespDecode, RespError, RespMap, RespNull, RespSet, SimpleError,
+    SimpleString,
 };
 
 // 关于 enum 的知识点
@@ -21,9 +21,9 @@ pub enum RespFrame {
     Error(SimpleError),
     Integer(i64),
     BulkString(BulkString),
-    NullBulkString(RespNullBulkString),
+    // NullBulkString(RespNullBulkString),
     Array(RespArray),
-    NullArray(RespNullArray),
+    // NullArray(RespNullArray),
     Null(RespNull),
     Boolean(bool),
     Double(f64),
@@ -49,27 +49,36 @@ impl RespDecode for RespFrame {
                 let frame = i64::decode(buf)?;
                 Ok(frame.into())
             }
+            // NOTE: refactor -> delete NullBulkString and NullArray
+            // Some(b'$') => {
+            //     // try null bulk string first
+            //     match RespNullBulkString::decode(buf) {
+            //         Ok(frame) => Ok(frame.into()),
+            //         Err(RespError::NotComplete) => Err(RespError::NotComplete),
+            //         Err(_) => {
+            //             let frame = BulkString::decode(buf)?;
+            //             Ok(frame.into())
+            //         }
+            //     }
+            // }
+            // Some(b'*') => {
+            //     // try null array first
+            //     match RespNullArray::decode(buf) {
+            //         Ok(frame) => Ok(frame.into()),
+            //         Err(RespError::NotComplete) => Err(RespError::NotComplete),
+            //         Err(_) => {
+            //             let frame = RespArray::decode(buf)?;
+            //             Ok(frame.into())
+            //         }
+            //     }
+            // }
             Some(b'$') => {
-                // try null bulk string first
-                match RespNullBulkString::decode(buf) {
-                    Ok(frame) => Ok(frame.into()),
-                    Err(RespError::NotComplete) => Err(RespError::NotComplete),
-                    Err(_) => {
-                        let frame = BulkString::decode(buf)?;
-                        Ok(frame.into())
-                    }
-                }
+                let frame = BulkString::decode(buf)?;
+                Ok(frame.into())
             }
             Some(b'*') => {
-                // try null array first
-                match RespNullArray::decode(buf) {
-                    Ok(frame) => Ok(frame.into()),
-                    Err(RespError::NotComplete) => Err(RespError::NotComplete),
-                    Err(_) => {
-                        let frame = RespArray::decode(buf)?;
-                        Ok(frame.into())
-                    }
-                }
+                let frame = RespArray::decode(buf)?;
+                Ok(frame.into())
             }
             Some(b'_') => {
                 let frame = RespNull::decode(buf)?;
@@ -161,7 +170,8 @@ mod tests {
 
         buf.extend_from_slice(b"$-1\r\n");
         let frame = RespFrame::decode(&mut buf)?;
-        assert_eq!(frame, RespNullBulkString.into());
+        // assert_eq!(frame, RespNullBulkString.into());
+        assert_eq!(frame, BulkString::new(vec![]).into());
 
         buf.extend_from_slice(b"*2\r\n$4\r\necho\r\n$5\r\nhello\r\n");
         let frame = RespFrame::decode(&mut buf)?;
@@ -176,7 +186,8 @@ mod tests {
 
         buf.extend_from_slice(b"*-1\r\n");
         let frame = RespFrame::decode(&mut buf)?;
-        assert_eq!(frame, RespNullArray.into());
+        // assert_eq!(frame, RespNullArray.into());
+        assert_eq!(frame, RespArray::new(vec![]).into());
 
         buf.extend_from_slice(b"_\r\n");
         let frame = RespFrame::decode(&mut buf)?;
