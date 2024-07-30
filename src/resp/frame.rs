@@ -30,7 +30,8 @@ pub enum RespFrame {
     Map(RespMap),
     Set(RespSet),
 }
-
+// NOTE: 这里需要 impl RespDecode, RespEncode 不需要是因为使用 enum_dispatch 宏的时候, 会自动实现这些 trait
+// RespDecode 不能使用 enum_dispatch, 因为不支持 trait 中带有 associated type/ const 的情况
 impl RespDecode for RespFrame {
     const PREFIX: &'static str = "";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
@@ -136,5 +137,73 @@ impl<const N: usize> From<&[u8; N]> for RespFrame {
 
 #[cfg(test)]
 mod tests {
-    // TODO: Add tests
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_resp_frame_decode() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"+OK\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, SimpleString::new("OK".to_string()).into());
+
+        buf.extend_from_slice(b"-Error message\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, SimpleError::new("Error message".to_string()).into());
+
+        buf.extend_from_slice(b":1000\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, 1000i64.into());
+
+        buf.extend_from_slice(b"$5\r\nhello\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, BulkString::new(b"hello").into());
+
+        buf.extend_from_slice(b"$-1\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, RespNullBulkString.into());
+
+        buf.extend_from_slice(b"*2\r\n$4\r\necho\r\n$5\r\nhello\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(
+            frame,
+            RespArray::new([
+                BulkString::new("echo").into(),
+                BulkString::new("hello").into()
+            ])
+            .into()
+        );
+
+        buf.extend_from_slice(b"*-1\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, RespNullArray.into());
+
+        buf.extend_from_slice(b"_\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, RespNull.into());
+
+        buf.extend_from_slice(b"#t\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, true.into());
+
+        buf.extend_from_slice(b"#f\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, false.into());
+
+        buf.extend_from_slice(b",1.23\r\n");
+        let frame = RespFrame::decode(&mut buf)?;
+        assert_eq!(frame, 1.23f64.into());
+
+        buf.extend_from_slice(b"%2\r\n+hello\r\n$5\r\nworld\r\n+foo\r\n$3\r\nbar\r\n");
+        let frame = RespMap::decode(&mut buf)?;
+        let mut map = RespMap::new();
+        map.insert(
+            "hello".to_string(),
+            BulkString::new(b"world".to_vec()).into(),
+        );
+        map.insert("foo".to_string(), BulkString::new(b"bar".to_vec()).into());
+        assert_eq!(frame, map);
+
+        Ok(())
+    }
 }

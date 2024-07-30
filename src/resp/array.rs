@@ -42,7 +42,7 @@ impl RespDecode for RespArray {
             return Err(RespError::NotComplete);
         }
 
-        buf.advance(end + CRLF_LEN);
+        buf.advance(end + CRLF_LEN); // skip the prefix and CRLF
 
         let mut frames = Vec::with_capacity(len);
         for _ in 0..len {
