@@ -1,5 +1,5 @@
 mod sadd;
 mod sismember;
 
-pub use sadd::SAdd;
-pub use sismember::SIsMember;
+pub(crate) use sadd::SAdd;
+pub(crate) use sismember::SIsMember;

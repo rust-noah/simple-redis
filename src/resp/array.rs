@@ -12,8 +12,8 @@ const NULL_ARRAY: &[u8] = b"*-1\r\n";
 #[derive(Debug, Clone, PartialEq)]
 pub struct RespArray(pub(crate) Vec<RespFrame>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RespNullArray;
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub struct RespNullArray;
 
 impl RespArray {
     pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {

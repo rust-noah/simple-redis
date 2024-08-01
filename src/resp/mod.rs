@@ -14,15 +14,9 @@ use bytes::{Buf, BytesMut};
 use enum_dispatch::enum_dispatch;
 use thiserror::Error;
 
-pub use self::{
-    array::{RespArray, RespNullArray},
-    bulk_string::{BulkString, RespNullBulkString},
-    frame::RespFrame,
-    map::RespMap,
-    null::RespNull,
-    set::RespSet,
-    simple_error::SimpleError,
-    simple_string::SimpleString,
+pub(crate) use self::{
+    array::RespArray, bulk_string::BulkString, frame::RespFrame, map::RespMap, null::RespNull,
+    set::RespSet, simple_error::SimpleError, simple_string::SimpleString,
 };
 
 const CRLF: &[u8] = b"\r\n";
@@ -144,7 +138,22 @@ fn extract_simple_frame_data(buf: &[u8], prefix: &str) -> Result<usize, RespErro
     Ok(end)
 }
 
-// find nth CRLF in the buffer
+/// The function `find_crlf` searches for the nth occurrence of the CRLF sequence (carriage return
+/// followed by line feed) in a byte slice.
+///
+/// Arguments:
+///
+/// * `buf`: The `buf` parameter is a slice of bytes (`&[u8]`) that represents the data in which you
+///   want to find the occurrence of the CRLF sequence (carriage return followed by line feed).
+/// * `nth`: The `nth` parameter in the `find_crlf` function represents the occurrence of the CRLF
+///   sequence (carriage return followed by line feed) that you want to find within the given byte buffer
+///   `buf`. It specifies which occurrence of the CRLF sequence you are interested in locating within the
+///
+/// Returns:
+///
+/// The function `find_crlf` returns an `Option<usize>`. It returns `Some(index)` if the nth occurrence
+/// of the CRLF sequence (b'\r\n') is found in the input buffer `buf`, where `index` is the index of the
+/// start of the CRLF sequence. If the nth occurrence is not found, it returns `None`.
 fn find_crlf(buf: &[u8], nth: usize) -> Option<usize> {
     let mut count = 0;
     for i in 1..buf.len() - 1 {
@@ -158,6 +167,21 @@ fn find_crlf(buf: &[u8], nth: usize) -> Option<usize> {
     None
 }
 
+/// The function `parse_length` parses the length of a frame data from a buffer using a specified
+/// prefix.
+///
+/// Arguments:
+///
+/// * `buf`: The `buf` parameter is a slice of bytes (`&[u8]`) that contains the data to be parsed.
+/// * `prefix`: The `prefix` parameter is a string slice (`&str`) that represents the prefix used to
+///   extract data from the buffer `buf`. It is used to identify the starting point for extracting the
+///   data from the buffer.
+///
+/// Returns:
+///
+/// The function `parse_length` is returning a `Result` containing a tuple. The tuple contains two
+/// values: the first value is the end index of the extracted data, and the second value is the parsed
+/// integer value from the extracted data.
 fn parse_length(buf: &[u8], prefix: &str) -> Result<(usize, usize), RespError> {
     let end = extract_simple_frame_data(buf, prefix)?;
     let s = String::from_utf8_lossy(&buf[prefix.len()..end]);

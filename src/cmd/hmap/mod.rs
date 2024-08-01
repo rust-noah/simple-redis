@@ -3,7 +3,7 @@ mod hgetall;
 mod hmget;
 mod hset;
 
-pub use hget::HGet;
-pub use hgetall::HGetAll;
-pub use hmget::HMGet;
-pub use hset::HSet;
+pub(crate) use hget::HGet;
+pub(crate) use hgetall::HGetAll;
+pub(crate) use hmget::HMGet;
+pub(crate) use hset::HSet;

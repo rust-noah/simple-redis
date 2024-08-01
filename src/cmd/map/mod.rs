@@ -1,5 +1,5 @@
 mod get;
 mod set;
 
-pub use get::Get;
-pub use set::Set;
+pub(crate) use get::Get;
+pub(crate) use set::Set;
