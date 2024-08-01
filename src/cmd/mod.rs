@@ -1,10 +1,3 @@
-use std::sync::LazyLock;
-
-use command::CommandError;
-use enum_dispatch::enum_dispatch;
-
-use crate::{Backend, RespArray, RespFrame, SimpleString};
-
 mod command;
 mod echo;
 mod hmap;
@@ -12,14 +5,25 @@ mod map;
 mod set;
 mod unrecognized;
 
-pub use {
-    command::Command,
+use {
+    crate::{Backend, RespArray, RespFrame, SimpleString},
+    enum_dispatch::enum_dispatch,
+    std::sync::LazyLock,
+};
+pub(crate) use {
+    command::{Command, CommandError},
     echo::Echo,
     hmap::{HGet, HGetAll, HMGet, HSet},
     map::{Get, Set},
     set::{SAdd, SIsMember},
     unrecognized::Unrecognized,
 };
+
+#[enum_dispatch]
+pub trait CommandExecutor {
+    // fn execute(&self) -> RespFrame;
+    fn execute(self, backend: &Backend) -> RespFrame;
+}
 
 // NOTE: you could also use once_cell instead of lazy_static
 // lazy_static:
@@ -29,18 +33,11 @@ pub use {
 // lazy_static! {
 //     static ref RESP_OK: RespFrame = SimpleString::new("OK").into();
 // }
-
 // NOTE: > Rust 1.80.0
 // https://blog.rust-lang.org/2024/07/25/Rust-1.80.0.html
-static RESP_OK: LazyLock<RespFrame> = LazyLock::new(|| SimpleString::new("OK").into());
+pub static RESP_OK: LazyLock<RespFrame> = LazyLock::new(|| SimpleString::new("OK").into());
 
-#[enum_dispatch]
-pub trait CommandExecutor {
-    // fn execute(&self) -> RespFrame;
-    fn execute(self, backend: &Backend) -> RespFrame;
-}
-
-fn validate_command(
+pub fn validate_command(
     value: &RespArray,
     names: &[&'static str],
     n_args: usize,
@@ -74,6 +71,6 @@ fn validate_command(
     Ok(())
 }
 
-fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
+pub fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
     Ok(value.0.into_iter().skip(start).collect::<Vec<RespFrame>>())
 }

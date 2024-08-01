@@ -9,8 +9,8 @@ const NULL_BULK_STRING: &[u8] = b"$-1\r\n";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BulkString(pub(crate) Vec<u8>); // 单个二进制字符串, 用于存储二进制数据(最大512MB)
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RespNullBulkString;
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub struct RespNullBulkString;
 
 impl BulkString {
     pub fn new(s: impl Into<Vec<u8>>) -> Self {
